@@ -42,12 +42,14 @@ These steps set up UptimeCat as a persistent background service using
 **systemd** and **Gunicorn** so it survives reboots and restarts automatically
 on failure.
 
+**Requirements:** Python 3.10 or newer, `python3-venv`, `git`.
+
 ### 1. Create a dedicated user and install directory
 
 ```bash
 sudo useradd --system --shell /usr/sbin/nologin --home /opt/uptimecat uptimecat
-sudo mkdir -p /opt/uptimecat /var/log/uptimecat
-sudo chown uptimecat:uptimecat /opt/uptimecat /var/log/uptimecat
+sudo mkdir -p /opt/uptimecat
+sudo chown uptimecat:uptimecat /opt/uptimecat
 ```
 
 ### 2. Copy the application files
@@ -90,13 +92,14 @@ The dashboard is now available at `http://<your-server-ip>:5000`.
 
 ### Viewing logs
 
+All output is captured by systemd's journal:
+
 ```bash
 # Live log stream
 sudo journalctl -u uptimecat -f
 
-# Access / error logs written by Gunicorn
-sudo tail -f /var/log/uptimecat/access.log
-sudo tail -f /var/log/uptimecat/error.log
+# Last 100 lines
+sudo journalctl -u uptimecat -n 100
 ```
 
 ### Common management commands
@@ -109,8 +112,10 @@ sudo systemctl disable uptimecat   # don't start at boot
 
 ### (Optional) Reverse proxy with nginx
 
-If you want to serve UptimeCat on port 80/443 or behind a domain name, place
-this snippet inside your nginx `server {}` block:
+If you want to serve UptimeCat on port 80/443 or behind a domain name, change
+the `--bind` address in `uptimecat.service` to `127.0.0.1:5000` (so it is not
+directly reachable from the network) and then place this snippet inside your
+nginx `server {}` block:
 
 ```nginx
 location / {

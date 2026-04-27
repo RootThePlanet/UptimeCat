@@ -9,8 +9,6 @@ WorkingDirectory=/opt/uptimecat
 ExecStart=/opt/uptimecat/venv/bin/gunicorn \
     --workers 1 \
     --bind 0.0.0.0:5000 \
-    --access-logfile /var/log/uptimecat/access.log \
-    --error-logfile /var/log/uptimecat/error.log \
     "app:create_app()"
 Restart=always
 RestartSec=5
