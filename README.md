@@ -36,6 +36,100 @@ Open <http://localhost:5000> in your browser.
 
 ---
 
+## Deploy on a Linux server
+
+These steps set up UptimeCat as a persistent background service using
+**systemd** and **Gunicorn** so it survives reboots and restarts automatically
+on failure.
+
+### 1. Create a dedicated user and install directory
+
+```bash
+sudo useradd --system --shell /usr/sbin/nologin --home /opt/uptimecat uptimecat
+sudo mkdir -p /opt/uptimecat /var/log/uptimecat
+sudo chown uptimecat:uptimecat /opt/uptimecat /var/log/uptimecat
+```
+
+### 2. Copy the application files
+
+```bash
+# From your local machine (or clone directly on the server)
+sudo cp -r . /opt/uptimecat/
+sudo chown -R uptimecat:uptimecat /opt/uptimecat
+```
+
+Or clone directly on the server:
+
+```bash
+sudo -u uptimecat git clone https://github.com/RootThePlanet/UptimeCat /opt/uptimecat
+```
+
+### 3. Create a Python virtual environment and install dependencies
+
+```bash
+sudo -u uptimecat python3 -m venv /opt/uptimecat/venv
+sudo -u uptimecat /opt/uptimecat/venv/bin/pip install -r /opt/uptimecat/requirements.txt
+```
+
+### 4. Install the systemd service
+
+```bash
+sudo cp /opt/uptimecat/uptimecat.service /etc/systemd/system/uptimecat.service
+sudo systemctl daemon-reload
+sudo systemctl enable uptimecat   # start automatically at boot
+sudo systemctl start uptimecat
+```
+
+### 5. Check that it's running
+
+```bash
+sudo systemctl status uptimecat
+```
+
+The dashboard is now available at `http://<your-server-ip>:5000`.
+
+### Viewing logs
+
+```bash
+# Live log stream
+sudo journalctl -u uptimecat -f
+
+# Access / error logs written by Gunicorn
+sudo tail -f /var/log/uptimecat/access.log
+sudo tail -f /var/log/uptimecat/error.log
+```
+
+### Common management commands
+
+```bash
+sudo systemctl stop uptimecat      # stop the service
+sudo systemctl restart uptimecat   # restart after a config change
+sudo systemctl disable uptimecat   # don't start at boot
+```
+
+### (Optional) Reverse proxy with nginx
+
+If you want to serve UptimeCat on port 80/443 or behind a domain name, place
+this snippet inside your nginx `server {}` block:
+
+```nginx
+location / {
+    proxy_pass         http://127.0.0.1:5000;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Real-IP         $remote_addr;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+}
+```
+
+Then reload nginx:
+
+```bash
+sudo systemctl reload nginx
+```
+
+---
+
 ## Running tests
 
 ```bash
@@ -49,6 +143,7 @@ pytest tests/ -v
 ```
 app.py                 # Flask application, checker, scheduler, routes
 requirements.txt       # Python dependencies
+uptimecat.service      # systemd unit file for Linux server deployment
 static/
   css/style.css        # Stylesheet
   js/app.js            # Auto-refresh helper
