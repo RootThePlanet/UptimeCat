@@ -38,68 +38,39 @@ Open <http://localhost:5000> in your browser.
 
 ## Deploy on a Linux server
 
-These steps set up UptimeCat as a persistent background service using
-**systemd** and **Gunicorn** so it survives reboots and restarts automatically
-on failure.
+UptimeCat ships with an automated installer that handles every step for you.
 
-**Requirements:** Python 3.10 or newer, `python3-venv`, `git`.
+**Requirements:** Python 3.10+, `git`, a systemd-based Linux distribution
+(Debian, Ubuntu, RHEL, Fedora, etc.).
 
-### 1. Create a dedicated user and install directory
+### One-line install
 
 ```bash
-sudo useradd --system --shell /usr/sbin/nologin --home /opt/uptimecat uptimecat
-sudo mkdir -p /opt/uptimecat
-sudo chown uptimecat:uptimecat /opt/uptimecat
+curl -fsSL https://raw.githubusercontent.com/RootThePlanet/UptimeCat/main/install.sh | sudo bash
 ```
 
-### 2. Copy the application files
+That single command will:
+1. Verify prerequisites (Python, git, systemd)
+2. Create a dedicated `uptimecat` system user
+3. Clone the repository to `/opt/uptimecat`
+4. Create a Python virtual environment and install all dependencies
+5. Install and enable the systemd service (starts automatically at boot)
+6. Start UptimeCat and print the dashboard URL
+
+The installer is **idempotent** — run it again at any time to update to the
+latest version.
+
+### After installing
 
 ```bash
-# From your local machine (or clone directly on the server)
-sudo cp -r . /opt/uptimecat/
-sudo chown -R uptimecat:uptimecat /opt/uptimecat
-```
-
-Or clone directly on the server:
-
-```bash
-sudo -u uptimecat git clone https://github.com/RootThePlanet/UptimeCat /opt/uptimecat
-```
-
-### 3. Create a Python virtual environment and install dependencies
-
-```bash
-sudo -u uptimecat python3 -m venv /opt/uptimecat/venv
-sudo -u uptimecat /opt/uptimecat/venv/bin/pip install -r /opt/uptimecat/requirements.txt
-```
-
-### 4. Install the systemd service
-
-```bash
-sudo cp /opt/uptimecat/uptimecat.service /etc/systemd/system/uptimecat.service
-sudo systemctl daemon-reload
-sudo systemctl enable uptimecat   # start automatically at boot
-sudo systemctl start uptimecat
-```
-
-### 5. Check that it's running
-
-```bash
+# Check the service is running
 sudo systemctl status uptimecat
-```
 
-The dashboard is now available at `http://<your-server-ip>:5000`.
-
-### Viewing logs
-
-All output is captured by systemd's journal:
-
-```bash
 # Live log stream
 sudo journalctl -u uptimecat -f
 
-# Last 100 lines
-sudo journalctl -u uptimecat -n 100
+# Update to the latest version
+sudo bash /opt/uptimecat/install.sh
 ```
 
 ### Common management commands
@@ -112,10 +83,9 @@ sudo systemctl disable uptimecat   # don't start at boot
 
 ### (Optional) Reverse proxy with nginx
 
-If you want to serve UptimeCat on port 80/443 or behind a domain name, change
-the `--bind` address in `uptimecat.service` to `127.0.0.1:5000` (so it is not
-directly reachable from the network) and then place this snippet inside your
-nginx `server {}` block:
+To serve UptimeCat on port 80/443 or behind a domain name, edit
+`/etc/systemd/system/uptimecat.service` and change `--bind 0.0.0.0:5000` to
+`--bind 127.0.0.1:5000`, then add this to your nginx `server {}` block:
 
 ```nginx
 location / {
@@ -127,9 +97,8 @@ location / {
 }
 ```
 
-Then reload nginx:
-
 ```bash
+sudo systemctl daemon-reload && sudo systemctl restart uptimecat
 sudo systemctl reload nginx
 ```
 
@@ -148,7 +117,8 @@ pytest tests/ -v
 ```
 app.py                 # Flask application, checker, scheduler, routes
 requirements.txt       # Python dependencies
-uptimecat.service      # systemd unit file for Linux server deployment
+install.sh             # One-command Linux server installer
+uptimecat.service      # systemd unit file (also written by install.sh)
 static/
   css/style.css        # Stylesheet
   js/app.js            # Auto-refresh helper
