@@ -84,9 +84,9 @@ if [[ -z "$PYTHON" ]]; then
 fi
 info "Python found: $PYTHON ($($PYTHON --version))"
 
-# python3-venv / ensurepip
-if ! "$PYTHON" -m ensurepip --version &>/dev/null && ! "$PYTHON" -c 'import venv' &>/dev/null; then
-    die "Python venv module not found. Install it with: apt install python3-venv"
+# python3-venv
+if ! "$PYTHON" -m venv --help &>/dev/null; then
+    die "Python venv module not found. Install it with: apt install python3-venv  OR  dnf install python3"
 fi
 info "Python venv module available"
 
@@ -195,7 +195,11 @@ fi
 # 7. Done
 # ---------------------------------------------------------------------------
 # Determine a sensible IP to show the user
-SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "<your-server-ip>")
+SERVER_IP=$(ip route get 1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}')
+if [[ -z "$SERVER_IP" ]]; then
+    SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+fi
+SERVER_IP=${SERVER_IP:-"<your-server-ip>"}
 
 echo -e "\n${BOLD}${GREEN}══════════════════════════════════════${RESET}"
 echo -e "${BOLD}${GREEN}  UptimeCat is running! 🐱${RESET}"
