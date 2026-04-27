@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — UptimeCat{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Dashboard</h1>
+
+{% if errors %}
+<div class="alert alert-error">
+  <ul>
+    {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<!-- Add-site form -->
+<section class="card add-site-card">
+  <h2>Add a Site to Monitor</h2>
+  <form method="POST" action="{{ url_for('form_add_site') }}" class="add-site-form">
+    <div class="form-row">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name"
+             value="{{ form_data.name if form_data else '' }}"
+             placeholder="My Website" required />
+    </div>
+    <div class="form-row">
+      <label for="url">URL</label>
+      <input type="url" id="url" name="url"
+             value="{{ form_data.url if form_data else '' }}"
+             placeholder="https://example.com" required />
+    </div>
+    <div class="form-row">
+      <label for="check_interval">Check interval</label>
+      <div class="interval-row">
+        <input type="number" id="check_interval" name="check_interval"
+               value="{{ form_data.check_interval if form_data else 300 }}"
+               min="60" step="60" required />
+        <span class="hint">seconds (min 60 · 300 = 5 min · 3600 = 1 hr · 86400 = 1 day)</span>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>
+        <input type="checkbox" name="enabled" value="1" checked />
+        Enable monitoring immediately
+      </label>
+    </div>
+    <button type="submit" class="btn btn-primary">Add Site</button>
+  </form>
+</section>
+
+<!-- Site list -->
+<section class="site-list">
+  {% if site_stats %}
+  <h2>Monitored Sites</h2>
+  <div class="sites-grid">
+    {% for entry in site_stats %}
+    {% set site = entry.site %}
+    {% set last = entry.last_check %}
+    <div class="site-card {% if last %}{% if last.is_up %}status-up{% else %}status-down{% endif %}{% else %}status-unknown{% endif %}">
+      <div class="site-card-header">
+        <div>
+          <a href="{{ url_for('site_detail', site_id=site.id) }}" class="site-name">{{ site.name }}</a>
+          <div class="site-url">{{ site.url }}</div>
+        </div>
+        <div class="status-badge {% if last %}{% if last.is_up %}up{% else %}down{% endif %}{% else %}unknown{% endif %}">
+          {% if last %}
+            {% if last.is_up %}UP{% else %}DOWN{% endif %}
+          {% else %}
+            NO DATA
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="site-card-body">
+        {% if last %}
+        <div class="stat">
+          <span class="stat-label">Status code</span>
+          <span class="stat-value">{{ last.status_code or '—' }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Response time</span>
+          <span class="stat-value">{% if last.response_time_ms %}{{ last.response_time_ms | round(0) | int }} ms{% else %}—{% endif %}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Last checked</span>
+          <span class="stat-value">{{ last.checked_at }}</span>
+        </div>
+        {% endif %}
+        {% if entry.uptime_24h is not none %}
+        <div class="stat">
+          <span class="stat-label">24 h uptime</span>
+          <span class="stat-value uptime-pct">{{ entry.uptime_24h }}%</span>
+        </div>
+        {% endif %}
+        <div class="stat">
+          <span class="stat-label">Interval</span>
+          <span class="stat-value">{{ site.check_interval }}s</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Monitoring</span>
+          <span class="stat-value">{{ 'enabled' if site.enabled else 'disabled' }}</span>
+        </div>
+      </div>
+
+      <div class="site-card-actions">
+        <form method="POST" action="{{ url_for('form_check_now', site_id=site.id) }}">
+          <button type="submit" class="btn btn-sm btn-secondary">Check now</button>
+        </form>
+        <form method="POST" action="{{ url_for('form_toggle_site', site_id=site.id) }}">
+          <button type="submit" class="btn btn-sm {% if site.enabled %}btn-warning{% else %}btn-primary{% endif %}">
+            {{ 'Pause' if site.enabled else 'Resume' }}
+          </button>
+        </form>
+        <a href="{{ url_for('site_detail', site_id=site.id) }}" class="btn btn-sm btn-info">History</a>
+        <form method="POST" action="{{ url_for('form_delete_site', site_id=site.id) }}"
+              onsubmit="return confirm('Delete {{ site.name }}?')">
+          <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>No sites yet. Add one above to get started! 🐱</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

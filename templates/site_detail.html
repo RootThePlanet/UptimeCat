@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}{{ site.name }} — UptimeCat{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('index') }}">← Dashboard</a>
+</div>
+
+<h1 class="page-title">{{ site.name }}</h1>
+<div class="site-url-detail">
+  <a href="{{ site.url }}" target="_blank" rel="noopener">{{ site.url }}</a>
+</div>
+
+<!-- Controls -->
+<div class="detail-controls">
+  <form method="POST" action="{{ url_for('form_check_now', site_id=site.id) }}">
+    <button type="submit" class="btn btn-primary">Check now</button>
+  </form>
+  <form method="POST" action="{{ url_for('form_toggle_site', site_id=site.id) }}">
+    <button type="submit" class="btn {% if site.enabled %}btn-warning{% else %}btn-secondary{% endif %}">
+      {{ 'Pause monitoring' if site.enabled else 'Resume monitoring' }}
+    </button>
+  </form>
+  <form method="POST" action="{{ url_for('form_delete_site', site_id=site.id) }}"
+        onsubmit="return confirm('Delete {{ site.name }}?')">
+    <button type="submit" class="btn btn-danger">Delete site</button>
+  </form>
+</div>
+
+<!-- Uptime chart -->
+<section class="card">
+  <h2>Uptime History</h2>
+  <div class="chart-period-tabs">
+    <button class="tab-btn active" data-days="30">30 days</button>
+    <button class="tab-btn" data-days="60">60 days</button>
+    <button class="tab-btn" data-days="90">90 days</button>
+  </div>
+  <div class="chart-container">
+    <canvas id="uptimeChart"></canvas>
+  </div>
+</section>
+
+<!-- Recent checks table -->
+<section class="card">
+  <h2>Recent Checks</h2>
+  {% if recent_checks %}
+  <div class="table-wrapper">
+    <table class="checks-table">
+      <thead>
+        <tr>
+          <th>Time (UTC)</th>
+          <th>Status</th>
+          <th>HTTP Code</th>
+          <th>Response Time</th>
+          <th>Error</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for check in recent_checks %}
+        <tr class="{% if check.is_up %}row-up{% else %}row-down{% endif %}">
+          <td>{{ check.checked_at }}</td>
+          <td>
+            <span class="status-badge {% if check.is_up %}up{% else %}down{% endif %}">
+              {{ 'UP' if check.is_up else 'DOWN' }}
+            </span>
+          </td>
+          <td>{{ check.status_code or '—' }}</td>
+          <td>{% if check.response_time_ms %}{{ check.response_time_ms | round(0) | int }} ms{% else %}—{% endif %}</td>
+          <td class="error-cell">{{ check.error_message or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">No checks recorded yet. Click "Check now" to run the first check.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/chart.umd.js') }}"></script>
+<script>
+  const SITE_ID = {{ site.id }};
+  let chart = null;
+
+  async function loadChart(days) {
+    const resp = await fetch(`/api/sites/${SITE_ID}/history?days=${days}`);
+    const data = await resp.json();
+    const labels = data.history.map(r => r.day);
+    const values = data.history.map(r => r.uptime_pct !== null ? r.uptime_pct : 0);
+
+    const ctx = document.getElementById('uptimeChart').getContext('2d');
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Uptime %',
+          data: values,
+          backgroundColor: values.map(v => v >= 99 ? '#22c55e' : v >= 90 ? '#eab308' : '#ef4444'),
+          borderRadius: 3,
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            min: 0,
+            max: 100,
+            ticks: { callback: v => v + '%' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.parsed.y.toFixed(2)}% uptime`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadChart(btn.dataset.days);
+    });
+  });
+
+  loadChart(30);
+</script>
+{% endblock %}
