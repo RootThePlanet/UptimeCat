@@ -1,6 +1,6 @@
 # UptimeCat 🐱
 
-**This cat never sleeps.** Track the uptime of your websites.
+**The cat never sleeps.** Track the uptime of your websites.
 
 UptimeCat is a Flask web application that monitors remote websites on a
 configurable schedule, checks multiple sites concurrently, and charts
