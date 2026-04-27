@@ -138,14 +138,21 @@ def _save_check(site_id: int, result: dict):
         )
 
 
+MAX_CONCURRENT_CHECKS = 20  # cap to avoid spawning too many threads at once
+
+
 def run_checks_for_sites(site_ids: list[int] | None = None):
     """
     Check enabled sites concurrently via a ThreadPoolExecutor.
 
     Args:
         site_ids: When ``None`` (default) every enabled site is checked.
-                  When a list of integers is provided only those site IDs
-                  are checked (still filtered to enabled sites only).
+                  When a non-empty list of integers is supplied only those
+                  site IDs are queried (still filtered to enabled sites only).
+                  An empty list is treated the same as ``None``.
+
+    The number of worker threads is capped at ``MAX_CONCURRENT_CHECKS`` to
+    prevent resource exhaustion when a large number of sites is configured.
     """
     with get_db() as conn:
         if site_ids:
@@ -162,7 +169,9 @@ def run_checks_for_sites(site_ids: list[int] | None = None):
     if not rows:
         return
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(rows)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(len(rows), MAX_CONCURRENT_CHECKS)
+    ) as executor:
         future_to_site = {
             executor.submit(check_site, row["url"]): row["id"] for row in rows
         }

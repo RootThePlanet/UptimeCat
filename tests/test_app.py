@@ -6,6 +6,7 @@ Run with:  pytest tests/
 
 import json
 import os
+import sqlite3
 import tempfile
 from unittest.mock import MagicMock, patch
 
@@ -13,7 +14,7 @@ import pytest
 
 # Import the Flask app factory and the check_site function.
 import app as uptimecat
-from app import check_site, create_app
+from app import check_site, create_app, get_db
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +43,31 @@ def flask_app(tmp_db):
 @pytest.fixture()
 def client(flask_app):
     return flask_app.test_client()
+
+
+# ---------------------------------------------------------------------------
+# Unit tests – check_site
+# ---------------------------------------------------------------------------
+
+
+class TestGetDb:
+    """Verify that get_db() returns a correctly configured connection."""
+
+    def test_row_factory(self, flask_app):
+        with flask_app.app_context() if False else open(os.devnull):
+            pass
+        conn = get_db()
+        assert conn.row_factory is sqlite3.Row
+
+    def test_foreign_keys_enabled(self, flask_app):
+        conn = get_db()
+        result = conn.execute("PRAGMA foreign_keys").fetchone()
+        assert result[0] == 1
+
+    def test_wal_mode(self, flask_app):
+        conn = get_db()
+        result = conn.execute("PRAGMA journal_mode").fetchone()
+        assert result[0] == "wal"
 
 
 # ---------------------------------------------------------------------------
